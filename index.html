@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>베이스 지판 연습 - V20.1</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#2563eb">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #050505; color: #f5f5f5; overflow-x: hidden; user-select: none; -webkit-tap-highlight-color: transparent; }
+        .fretboard-container { overflow-x: auto; scroll-behavior: smooth; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; }
+        .fretboard-container::-webkit-scrollbar { height: 10px; }
+        .fretboard-container::-webkit-scrollbar-thumb { background: #333; border-radius: 5px; }
+        .note-circle { transition: all 0.1s ease-out; pointer-events: none; }
+        .active-note { transform: scale(1.1) !important; ring: 4px white; box-shadow: 0 0 25px rgba(59, 130, 246, 0.8); z-index: 50; pointer-events: none; }
+        @keyframes beat-flash { 0% { background-color: #3b82f6; transform: scale(1.05); } 100% { background-color: #334155; transform: scale(1); } }
+        .beat-active { animation: beat-flash 0.15s ease-out; }
+        select { appearance: none; cursor: pointer; }
+        .status-btn { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+        .bpm-adj-btn { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 10px; background-color: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .bpm-preset-btn { padding: 4px 10px; font-size: 10px; font-weight: 800; border-radius: 6px; background: #171717; border: 1px solid #262626; color: #737373; }
+        .mute-btn { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: #171717; border: 1px solid #262626; transition: all 0.2s; }
+        .mute-btn.is-muted { background: rgba(239, 68, 68, 0.2); color: #ef4444; border-color: rgba(239, 68, 68, 0.5); }
+    </style>
+</head>
+<body class="min-h-screen p-2 md:p-4 flex flex-col items-center">
+
+    <header class="w-full max-w-7xl flex flex-col items-center gap-6 mb-8 border-b border-white/10 pb-6">
+        <div class="flex items-center gap-3 w-full justify-between">
+            <div class="flex items-center gap-3">
+                <div class="bg-blue-600 p-2 rounded-xl text-white shadow-lg"><i data-lucide="music" size="24"></i></div>
+                <h1 class="text-xl md:text-2xl font-black tracking-tighter italic text-blue-500 leading-none">베이스 지판 연습</h1>
+            </div>
+            <div class="flex gap-2">
+                <button id="string-mode-toggle" class="status-btn px-3 py-1.5 bg-neutral-900 rounded-lg text-[10px] font-black border border-white/5"><span id="string-mode-display" class="text-blue-500">5현</span></button>
+                <button id="accidental-toggle" class="status-btn px-3 py-1.5 bg-neutral-900 rounded-lg text-[10px] font-black border border-white/5"><span id="accidental-display" class="text-blue-500">#</span></button>
+            </div>
+        </div>
+
+        <div class="w-full grid grid-cols-1 md:grid-cols-2 lg:flex lg:flex-row items-center justify-center gap-4 bg-neutral-900/90 backdrop-blur p-4 rounded-3xl border border-white/5 shadow-2xl">
+            <div class="flex items-center gap-4 px-4 justify-between md:justify-start border-b md:border-b-0 md:border-r border-white/10 pb-4 md:pb-0">
+                <button id="metro-toggle" class="status-btn w-20 h-20 bg-white rounded-full flex items-center justify-center text-black shadow-2xl active:scale-90 ring-4 ring-white/10"><i data-lucide="pause" id="metro-icon" size="40"></i></button>
+                <div class="flex flex-col items-center justify-center gap-1">
+                    <div class="flex items-center gap-2">
+                        <button id="bpm-minus" class="bpm-adj-btn"><i data-lucide="minus" size="16"></i></button>
+                        <div class="flex flex-col items-center min-w-[70px]"><span id="bpm-display" class="text-4xl font-black tabular-nums leading-none text-white">120</span><span class="text-[8px] text-neutral-500 font-bold uppercase mt-1">BPM</span></div>
+                        <button id="bpm-plus" class="bpm-adj-btn"><i data-lucide="plus" size="16"></i></button>
+                    </div>
+                    <div id="beat-dots" class="flex gap-2 mt-2"><div class="w-2 h-2 rounded-full bg-neutral-800"></div><div class="w-2 h-2 rounded-full bg-neutral-800"></div><div class="w-2 h-2 rounded-full bg-neutral-800"></div><div class="w-2 h-2 rounded-full bg-neutral-800"></div></div>
+                </div>
+            </div>
+            <div class="flex flex-col gap-3 flex-1 min-w-[200px] p-2">
+                <div class="flex items-center gap-3"><i data-lucide="gauge" size="14" class="text-neutral-500"></i><input type="range" id="bpm-slider" min="40" max="280" value="120" class="w-full h-1.5 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-blue-500"></div>
+                <div class="flex justify-between px-6">
+                    <button class="bpm-preset-btn" onclick="updateBPM(60)">60</button><button class="bpm-preset-btn" onclick="updateBPM(80)">80</button><button class="bpm-preset-btn" onclick="updateBPM(100)">100</button><button class="bpm-preset-btn" onclick="updateBPM(120)">120</button><button class="bpm-preset-btn" onclick="updateBPM(160)">160</button>
+                </div>
+                <div class="flex items-center gap-3">
+                    <button id="mute-toggle" class="mute-btn"><i data-lucide="volume-2" id="mute-icon" size="20"></i></button>
+                    <input type="range" id="vol-slider" min="0" max="1.5" step="0.05" value="0.8" class="flex-1 h-1.5 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-neutral-500">
+                </div>
+            </div>
+            <div class="flex items-center gap-2 border-t md:border-t-0 md:border-l border-white/10 pt-4 md:pt-0 lg:pl-4">
+                <select id="drum-type" class="flex-1 bg-neutral-800 text-[12px] font-black py-3 px-8 rounded-xl border border-white/10 outline-none text-neutral-300"><option value="none">Click</option><option value="8bit">8-bit</option><option value="16bit">16-bit</option><option value="shuffle">shuffle</option></select>
+                <div class="flex bg-black/40 p-1 rounded-xl">
+                    <button id="mode-keyboard-btn" class="p-2.5 rounded-lg transition bg-neutral-700 text-white" onclick="setMode('keyboard')"><i data-lucide="keyboard" size="18"></i></button>
+                    <button id="mode-reference-btn" class="p-2.5 rounded-lg transition text-neutral-500" onclick="setMode('reference')"><i data-lucide="layers" size="18"></i></button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="w-full max-w-7xl flex flex-col gap-6">
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <div class="bg-neutral-900 p-5 rounded-3xl border border-white/10 shadow-xl space-y-4"><label class="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Root Note</label><div id="root-selector" class="grid grid-cols-4 gap-1.5"></div></div>
+            <div class="lg:col-span-2 bg-neutral-900 p-5 rounded-3xl border border-white/10 shadow-xl flex flex-col gap-4 relative"><div class="flex justify-between items-center"><div class="flex items-center gap-3"><label class="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Progression Loop</label><div id="next-chord-indicator" class="hidden text-[10px] font-black text-blue-400 bg-blue-900/30 px-2 py-0.5 rounded-md animate-pulse">NEXT: <span id="next-chord-name">-</span></div></div><button id="prog-random-btn" class="status-btn text-[10px] font-bold bg-neutral-800 border border-white/5 px-3 py-1.5 rounded-full text-neutral-500 hover:text-white flex items-center gap-1"><i data-lucide="shuffle" size="12"></i> 랜덤</button></div><div class="flex items-center gap-3"><div id="prog-builder-steps" class="flex-1 grid grid-cols-4 gap-2"></div><button id="prog-play-btn" class="status-btn bg-white text-black p-4 rounded-2xl shadow-xl active:scale-95"><i data-lucide="repeat" size="20"></i></button></div></div>
+            <div class="bg-neutral-900 p-5 rounded-3xl border border-white/10 shadow-xl space-y-4"><label class="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Scale & Interval</label><select id="scale-dropdown" class="w-full bg-neutral-800 text-[11px] font-bold p-3 rounded-xl border border-white/10 outline-none text-neutral-300"></select><div id="interval-selector" class="grid grid-cols-6 gap-1.5"></div></div>
+        </div>
+        <div class="fretboard-container rounded-[40px] border-8 border-neutral-900 shadow-2xl bg-neutral-900/40 py-10 px-4 md:px-12"><div id="fretboard" class="inline-block relative"></div></div>
+        <div id="legend" class="flex flex-wrap gap-2 justify-center opacity-40 hover:opacity-100 transition p-4"></div>
+    </main>
+
+    <footer class="mt-8 text-neutral-700 text-[10px] tracking-widest uppercase font-bold pb-10 text-center">V20.1 Final • Offline Ready</footer>
+
+    <script>
+        // --- [오프라인 설정을 위한 서비스 워커 등록] ---
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                .then(reg => console.log('서비스 워커 등록 성공:', reg.scope))
+                .catch(err => console.log('서비스 워커 등록 실패:', err));
+            });
+        }
+
+        const NOTES_SHARP = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const NOTES_FLAT = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+        let accidentalMode = 'sharp';
+        let stringCount = 5;
+
+        function getNoteName(index) { index = ((index % 12) + 12) % 12; return accidentalMode === 'sharp' ? NOTES_SHARP[index] : NOTES_FLAT[index]; }
+
+        const INTERVALS = [
+            { id: 0, name: 'Root', short: 'P1', color: 'bg-neutral-600', text: 'text-white' },
+            { id: 1, name: '단 2도', short: 'm2', color: 'bg-rose-400', text: 'text-rose-950' },
+            { id: 2, name: '장 2도', short: 'M2', color: 'bg-rose-600', text: 'text-white' },
+            { id: 3, name: '단 3도', short: 'm3', color: 'bg-amber-400', text: 'text-amber-950' },
+            { id: 4, name: '장 3도', short: 'M3', color: 'bg-amber-500', text: 'text-white' },
+            { id: 5, name: '완전 4도', short: 'P4', color: 'bg-emerald-500', text: 'text-white' },
+            { id: 6, name: '증 4도', short: 'TT', color: 'bg-purple-600', text: 'text-white' },
+            { id: 7, name: '완전 5도', short: 'P5', color: 'bg-blue-500', text: 'text-white' },
+            { id: 8, name: '단 6도', short: 'm6', color: 'bg-cyan-400', text: 'text-cyan-950' },
+            { id: 9, name: '장 6도', short: 'M6', color: 'bg-cyan-600', text: 'text-white' },
+            { id: 10, name: '단 7도', short: 'm7', color: 'bg-indigo-400', text: 'text-white' },
+            { id: 11, name: '장 7도', short: 'M7', color: 'bg-indigo-700', text: 'text-white' },
+        ];
+
+        const SCALES = [
+            { name: 'Major (Ionian)', notes: [0, 2, 4, 5, 7, 9, 11] },
+            { name: 'Dorian', notes: [0, 2, 3, 5, 7, 9, 10] },
+            { name: 'Phrygian', notes: [0, 1, 3, 5, 7, 8, 10] },
+            { name: 'Lydian', notes: [0, 2, 4, 6, 7, 9, 11] },
+            { name: 'Mixolydian', notes: [0, 2, 4, 5, 7, 9, 10] },
+            { name: 'Minor (Aeolian)', notes: [0, 2, 3, 5, 7, 8, 10] },
+            { name: 'Locrian', notes: [0, 1, 3, 5, 6, 8, 10] },
+            { name: 'Major Pentatonic', notes: [0, 2, 4, 7, 9] },
+            { name: 'Minor Pentatonic', notes: [0, 3, 5, 7, 10] },
+            { name: 'Blues Scale', notes: [0, 3, 5, 6, 7, 10] },
+            { name: 'None (Root Only)', notes: [0] } 
+        ];
+
+        let currentRoot = 0; let currentScaleIndex = 10; let selectedIntervals = [...SCALES[currentScaleIndex].notes]; 
+        let currentMode = 'keyboard'; let bpm = 120; let isMetroPlaying = false; let measureCount = 0;
+        let progression = [0, 5, 7, 0]; let nextProgression = null; let isProgActive = false; let isRandomProgMode = false; let progStep = 0;
+        let masterVolume = 0.8; let isMuted = false;
+
+        class BassEngine {
+            constructor() { this.ctx = null; this.mainGain = null; this.activeNotes = new Map(); }
+            init() { if (this.ctx) return; this.ctx = new (window.AudioContext || window.webkitAudioContext)(); this.mainGain = this.ctx.createGain(); this.updateVolume(); this.mainGain.connect(this.ctx.destination); }
+            updateVolume() { if (!this.mainGain) return; this.mainGain.gain.setTargetAtTime(isMuted ? 0 : masterVolume * 1.5, this.ctx.currentTime, 0.02); }
+            startNote(freq, id, visualEl) { this.init(); if (this.ctx.state === 'suspended') this.ctx.resume(); const osc = this.ctx.createOscillator(); const g = this.ctx.createGain(); osc.type = 'triangle'; osc.frequency.setValueAtTime(freq, this.ctx.currentTime); g.gain.setValueAtTime(0, this.ctx.currentTime); g.gain.linearRampToValueAtTime(0.5, this.ctx.currentTime + 0.05); osc.connect(g); g.connect(this.mainGain); osc.start(); this.activeNotes.set(id, { osc, g, visualEl }); }
+            stopNote(id) { const note = this.activeNotes.get(id); if (note) { const { osc, g, visualEl } = note; const releaseTime = 0.2; g.gain.cancelScheduledValues(this.ctx.currentTime); g.gain.setValueAtTime(g.gain.value, this.ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + releaseTime); osc.stop(this.ctx.currentTime + releaseTime); if (visualEl) visualEl.remove(); this.activeNotes.delete(id); } }
+            beep(type, time) { this.init(); const osc = this.ctx.createOscillator(); const g = this.ctx.createGain(); osc.type = 'sine'; if (type === 'high') { osc.frequency.setValueAtTime(1000, time); } else { osc.frequency.setValueAtTime(800, time); } g.gain.setValueAtTime(0.5, time); g.gain.exponentialRampToValueAtTime(0.01, time + 0.1); osc.connect(g); g.connect(this.mainGain); osc.start(time); osc.stop(time + 0.1); }
+        }
+        const engine = new BassEngine();
+
+        let nextNoteTime = 0.0; let currentBeat = 0; let timerID = null;
+        function scheduler() { while (nextNoteTime < engine.ctx.currentTime + 0.1) { const type = document.getElementById('drum-type').value; scheduleBeeps(nextNoteTime, currentBeat, type); if (currentBeat === 0) { if (isProgActive) { if (progStep === 0 && isRandomProgMode && nextProgression) { progression = [...nextProgression]; nextProgression = null; } currentRoot = progression[progStep]; let nextStep = (progStep + 1) % 4; if (nextStep === 0 && isRandomProgMode) { nextProgression = Array.from({length: 4}, () => Math.floor(Math.random() * 12)); } progStep = (progStep + 1) % 4; updateNextChordUI(); renderFretboard(); renderRootSelector(); updateProgBuilderUI(); } measureCount++; } updateBeatUI(currentBeat); nextNoteTime += 60.0 / bpm; currentBeat = (currentBeat + 1) % 4; } timerID = setTimeout(scheduler, 25.0); }
+        function scheduleBeeps(time, beat, type) { const beatLen = 60.0 / bpm; const accent = (beat === 0) ? 'high' : 'normal'; if (type === 'none') { engine.beep(accent, time); } else if (type === '8bit') { engine.beep(accent, time); engine.beep('normal', time + beatLen/2); } else if (type === '16bit') { engine.beep(accent, time); for(let i=1; i<4; i++) engine.beep('normal', time + (beatLen/4)*i); } else if (type === 'shuffle') { engine.beep(accent, time); engine.beep('normal', time + beatLen * 0.66); } }
+
+        function toggleMetro() { engine.init(); isMetroPlaying = !isMetroPlaying; const btn = document.getElementById('metro-toggle'); if (isMetroPlaying) { nextNoteTime = engine.ctx.currentTime; currentBeat = 0; measureCount = 0; progStep = 0; scheduler(); btn.classList.remove('bg-white', 'text-black'); btn.classList.add('bg-blue-600', 'text-white'); lucide.createIcons({ attrs: { id: 'metro-icon' }, name: 'play' }); } else { clearTimeout(timerID); btn.classList.remove('bg-blue-600', 'text-white'); btn.classList.add('bg-white', 'text-black'); lucide.createIcons({ attrs: { id: 'metro-icon' }, name: 'pause' }); } }
+
+        function setMode(mode) { currentMode = mode; document.getElementById('mode-keyboard-btn').className = `p-2.5 rounded-lg transition ${mode === 'keyboard' ? 'bg-neutral-700 text-white' : 'text-neutral-500'}`; document.getElementById('mode-reference-btn').className = `p-2.5 rounded-lg transition ${mode === 'reference' ? 'bg-neutral-700 text-white' : 'text-neutral-500'}`; renderFretboard(); }
+
+        function renderRootSelector() { const con = document.getElementById('root-selector'); con.innerHTML = ''; for (let i = 0; i < 12; i++) { const btn = document.createElement('button'); const active = currentRoot === i; btn.className = `py-2 text-[10px] font-bold rounded-xl border transition ${active ? 'bg-blue-600 border-blue-400 text-white shadow-lg' : 'bg-neutral-800 border-transparent text-neutral-500'}`; btn.textContent = getNoteName(i); btn.onclick = () => { currentRoot = i; renderRootSelector(); renderFretboard(); }; con.appendChild(btn); } }
+        function renderScaleSelector() { const drop = document.getElementById('scale-dropdown'); drop.innerHTML = SCALES.map((s, i) => `<option value="${i}" ${i === currentScaleIndex ? 'selected' : ''}>${s.name}</option>`).join(''); drop.onchange = (e) => { currentScaleIndex = parseInt(e.target.value); selectedIntervals = [...SCALES[currentScaleIndex].notes]; renderScaleSelector(); renderFretboard(); }; const con = document.getElementById('interval-selector'); con.innerHTML = ''; INTERVALS.forEach(inv => { const active = selectedIntervals.includes(inv.id); const btn = document.createElement('button'); btn.className = `py-2 text-[10px] font-bold rounded-lg border transition ${active ? inv.color + ' ' + inv.text : 'bg-neutral-800 text-neutral-600 border-transparent'}`; btn.textContent = inv.short; btn.onclick = () => { if (selectedIntervals.includes(inv.id)) selectedIntervals = selectedIntervals.filter(x => x !== inv.id); else selectedIntervals.push(inv.id); renderScaleSelector(); renderFretboard(); }; con.appendChild(btn); }); }
+        function updateProgBuilderUI() { const con = document.getElementById('prog-builder-steps'); con.innerHTML = ''; progression.forEach((p, i) => { const active = isProgActive && ((progStep - 1 + 4) % 4 === i); const select = document.createElement('select'); select.className = `w-full bg-neutral-800 text-sm font-black p-3 rounded-2xl border transition appearance-none text-center outline-none ${active ? 'bg-blue-600/40 border-blue-500 text-white shadow-lg' : 'bg-neutral-800 border-white/5 text-neutral-300 hover:border-white/20'}`; for (let nIdx = 0; nIdx < 12; nIdx++) { const opt = document.createElement('option'); opt.value = nIdx; opt.textContent = getNoteName(nIdx); if (nIdx === p) opt.selected = true; select.appendChild(opt); } select.onchange = (e) => { progression[i] = parseInt(e.target.value); if (!isProgActive && i === 0) { currentRoot = progression[0]; renderRootSelector(); renderFretboard(); } }; con.appendChild(select); }); }
+        function updateNextChordUI() { const ind = document.getElementById('next-chord-indicator'); const nameEl = document.getElementById('next-chord-name'); if (isProgActive) { ind.classList.remove('hidden'); let nextChordIdx = (progStep === 0 && isRandomProgMode && nextProgression) ? nextProgression[0] : progression[progStep]; nameEl.textContent = getNoteName(nextChordIdx); } else { ind.classList.add('hidden'); } }
+
+        function getFretWidth(fIdx) { if (fIdx === 0) return 60; const baseWidth = 110; return Math.max(baseWidth * Math.pow(0.9438, fIdx - 1), 40); }
+        function renderFretboard() { const board = document.getElementById('fretboard'); board.innerHTML = ''; const allStrings = [{ name: 'G', freq: 97.99 }, { name: 'D', freq: 73.41 }, { name: 'A', freq: 55.00 }, { name: 'E', freq: 41.20 }, { name: 'B', freq: 30.87 }]; const strings = stringCount === 4 ? allStrings.slice(0, 4) : allStrings; const inner = document.createElement('div'); inner.className = 'flex flex-col border-l-[14px] border-neutral-800'; const fretWidths = []; for(let i=0; i<22; i++) fretWidths.push(getFretWidth(i)); strings.forEach((s, sIdx) => { const row = document.createElement('div'); row.className = 'h-20 md:h-24 flex items-center relative border-b border-white/5 string-row'; const thickness = stringCount === 4 ? (1.5 + (3-sIdx)*1.5) : (1.5 + (4-sIdx)*1.2); row.innerHTML = `<div class="absolute w-full bg-gradient-to-r from-neutral-600 to-neutral-500 z-0 shadow-lg" style="height: ${thickness}px"></div><div class="absolute -left-12 md:-left-16 w-10 md:w-12 text-center font-black text-xl md:text-2xl text-neutral-700 select-none">${s.name}</div>`; for (let fIdx = 0; fIdx < 22; fIdx++) { const width = fretWidths[fIdx]; const fret = document.createElement('div'); fret.style.width = width + 'px'; fret.className = `h-full border-r-2 border-neutral-800 relative z-10 cursor-pointer hover:bg-white/5 transition flex items-center justify-center fret-unit ${fIdx === 0 ? 'bg-neutral-950/40 border-r-[12px] border-yellow-900/40' : ''}`; const absNote = ([7,2,9,4,11][sIdx] + fIdx) % 12; const relInt = (absNote - currentRoot + 12) % 12; const info = { name: getNoteName(absNote), interval: INTERVALS[relInt] }; const isSelected = selectedIntervals.includes(relInt); if (isSelected || currentMode === 'reference') { const circleSize = Math.max(30, Math.min(48, width * 0.75)); const mainFontSize = Math.floor(circleSize * 0.35); const subFontSize = Math.floor(circleSize * 0.18); fret.innerHTML = `<div class="note-circle rounded-full flex flex-col items-center justify-center shadow-2xl ${relInt === 0 ? 'bg-blue-600 ring-2 ring-blue-300' : info.interval.color} ${info.interval.text} ${isSelected ? '' : 'opacity-10 scale-75'}" style="width: ${circleSize}px; height: ${circleSize}px;"><span style="font-size: ${mainFontSize}px;" class="font-black tracking-tighter leading-none">${info.name}</span><span style="font-size: ${subFontSize}px;" class="font-bold opacity-70 mt-0.5">${info.interval.short}</span></div>`; } const noteId = `note-${sIdx}-${fIdx}`; const startPlay = (e) => { const freq = s.freq * Math.pow(2, fIdx / 12); const circleSize = Math.max(30, Math.min(48, fretWidths[fIdx] * 0.75)); const visual = createActiveVisual(info, circleSize); fret.appendChild(visual); engine.startNote(freq, noteId, visual); }; const stopPlay = () => engine.stopNote(noteId); fret.addEventListener('touchstart', startPlay, {passive: true}); fret.addEventListener('touchend', stopPlay); fret.addEventListener('touchcancel', stopPlay); fret.addEventListener('mousedown', startPlay); fret.addEventListener('mouseup', stopPlay); fret.addEventListener('mouseleave', stopPlay); row.appendChild(fret); } inner.appendChild(row); }); const markerRow = document.createElement('div'); markerRow.className = 'flex items-center h-10 mt-4'; for(let fIdx = 0; fIdx < 22; fIdx++) { const markContainer = document.createElement('div'); markContainer.style.width = fretWidths[fIdx] + 'px'; markContainer.className = `flex flex-col justify-center items-center gap-1.5`; if(fIdx === 12) markContainer.innerHTML = `<div class="w-2.5 h-2.5 rounded-full bg-neutral-600"></div><div class="w-2.5 h-2.5 rounded-full bg-neutral-600"></div>`; else if([3, 5, 7, 9, 15, 17, 19, 21].includes(fIdx)) markContainer.innerHTML = `<div class="w-2.5 h-2.5 rounded-full bg-neutral-600"></div>`; markerRow.appendChild(markContainer); } inner.appendChild(markerRow); board.appendChild(inner); }
+
+        function createActiveVisual(info, size) { const div = document.createElement('div'); const mainFontSize = Math.floor(size * 0.35); const subFontSize = Math.floor(size * 0.18); div.className = `absolute rounded-full flex flex-col items-center justify-center active-note ${info.interval.id === 0 ? 'bg-blue-500' : info.interval.color} ${info.interval.text}`; div.style.width = size + 'px'; div.style.height = size + 'px'; div.innerHTML = `<span style="font-size: ${mainFontSize}px;" class="font-black">${info.name}</span><span style="font-size: ${subFontSize}px;" class="font-bold">${info.interval.short}</span>`; return div; }
+        function updateBeatUI(beat) { const dots = document.querySelectorAll('#beat-dots div'); dots.forEach((d, i) => d.className = `w-1.5 h-1.5 rounded-full ${i === beat ? 'beat-active bg-blue-500' : 'bg-neutral-800'}`); }
+        function updateBPM(val) { bpm = Math.max(40, Math.min(280, val)); document.getElementById('bpm-slider').value = bpm; document.getElementById('bpm-display').textContent = bpm; }
+
+        document.getElementById('bpm-slider').oninput = (e) => updateBPM(parseInt(e.target.value));
+        document.getElementById('bpm-minus').onclick = () => updateBPM(bpm - 1);
+        document.getElementById('bpm-plus').onclick = () => updateBPM(bpm + 1);
+        document.getElementById('metro-toggle').onclick = toggleMetro;
+        document.getElementById('vol-slider').oninput = (e) => { masterVolume = parseFloat(e.target.value); if (masterVolume > 0) isMuted = false; updateMuteUI(); engine.updateVolume(); };
+        document.getElementById('mute-toggle').onclick = () => { isMuted = !isMuted; updateMuteUI(); engine.updateVolume(); };
+
+        function updateMuteUI() { const btn = document.getElementById('mute-toggle'); if (isMuted) { btn.classList.add('is-muted'); lucide.createIcons({ attrs: { id: 'mute-icon' }, name: 'volume-x' }); } else { btn.classList.remove('is-muted'); lucide.createIcons({ attrs: { id: 'mute-icon' }, name: 'volume-2' }); } }
+        document.getElementById('accidental-toggle').onclick = () => { accidentalMode = accidentalMode === 'sharp' ? 'flat' : 'sharp'; document.getElementById('accidental-display').textContent = accidentalMode === 'sharp' ? '#' : 'b'; renderRootSelector(); renderScaleSelector(); updateProgBuilderUI(); updateNextChordUI(); renderFretboard(); };
+        document.getElementById('string-mode-toggle').onclick = () => { stringCount = stringCount === 5 ? 4 : 5; document.getElementById('string-mode-display').textContent = stringCount + '현'; renderFretboard(); };
+        document.getElementById('prog-play-btn').onclick = () => { isProgActive = !isProgActive; const btn = document.getElementById('prog-play-btn'); if (isProgActive) { btn.classList.remove('bg-white', 'text-black'); btn.classList.add('bg-blue-600', 'text-white'); } else { btn.classList.remove('bg-blue-600', 'text-white'); btn.classList.add('bg-white', 'text-black'); } updateNextChordUI(); if (!isProgActive) { renderRootSelector(); updateProgBuilderUI(); } };
+        document.getElementById('prog-random-btn').onclick = () => { isRandomProgMode = !isRandomProgMode; const btn = document.getElementById('prog-random-btn'); if (isRandomProgMode) { btn.classList.remove('text-neutral-500', 'bg-neutral-800'); btn.classList.add('text-white', 'bg-blue-600', 'border-blue-400'); progression = Array.from({length: 4}, () => Math.floor(Math.random() * 12)); updateProgBuilderUI(); if (!isProgActive) { currentRoot = progression[0]; renderRootSelector(); renderFretboard(); } } else { btn.classList.remove('text-white', 'bg-blue-600', 'border-blue-400'); btn.classList.add('text-neutral-500', 'bg-neutral-800'); } };
+
+        window.onload = () => { lucide.createIcons(); renderRootSelector(); renderScaleSelector(); updateProgBuilderUI(); renderFretboard(); const leg = document.getElementById('legend'); INTERVALS.forEach(inv => { leg.innerHTML += `<div class="flex items-center gap-1 px-1.5 py-0.5 bg-neutral-900 rounded-md border border-white/5"><div class="w-1 h-1 rounded-full ${inv.color}"></div><span class="text-[7px] font-bold text-neutral-500">${inv.name}</span></div>`; }); };
+    </script>
+</body>
+</html>

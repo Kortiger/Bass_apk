@@ -1,0 +1,19 @@
+{
+  "name": "베이스 지판 연습",
+  "short_name": "베이스연습",
+  "description": "베이스 기타 지판 연습을 위한 웹 앱",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#050505",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "orientation": "portrait",
+  "scope": "./"
+}
